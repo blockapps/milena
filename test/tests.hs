@@ -40,7 +40,44 @@ import Network.Kafka.Protocol (ProduceResponse(..),
 
 
 main :: IO ()
-main = testSpec "the specs" specs >>= defaultMain
+main = testSpec "milena" basic >>= defaultMain
+
+
+basic :: Spec
+basic = do
+    let basicTopicName = "milena-test"
+        run = runKafka $ mkKafkaState "milena-test-client" ("localhost", 9092)
+
+    describe "basic create topic, write/read message, delete topic" $ do
+
+        describe "create topic(s)" $ do
+            it "create topic non existent topic" $ do
+                result <- run $ do
+                    createTopic (createTopicsRequest basicTopicName 1 1 [] [])
+                result `shouldBe` (Right $ TopicsResp [(basicTopicName, NoError)])
+
+            it "create existing topic" $ do
+                result <- run $ do
+                    createTopic (createTopicsRequest basicTopicName 1 1 [] [])
+                result `shouldBe` (Right $ TopicsResp [(basicTopicName, TopicAlreadyExists)])
+
+        describe "delete topic(s)" $ do
+            it "delete topic existing topic" $ do
+                result <- run $ do
+                    deleteTopic (deleteTopicsRequest basicTopicName)
+                result `shouldBe` (Right $ DeleteTopicsResp [(basicTopicName, NoError)])
+
+            it "delete non-existing topic" $ do
+                let topicName = "this-topic-shouldnt-exit"
+                result <- run $ do
+                    deleteTopic (deleteTopicsRequest topicName)
+                result `shouldBe` (Right $ DeleteTopicsResp [(topicName, UnknownTopicOrPartition)])
+
+
+
+
+{-
+    testSpec "the specs" specs >>= defaultMain
 
 specs :: Spec
 specs = do
@@ -235,3 +272,4 @@ specs = do
 
 prop :: Testable prop => String -> prop -> SpecWith ()
 prop s = it s . property
+-}
