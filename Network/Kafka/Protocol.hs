@@ -508,7 +508,9 @@ requestBytes x = runPut $ do
     where mr = runPut $ serialize x
 
 apiVersion :: RequestMessage -> ApiVersion
-apiVersion _ = ApiVersion 0 -- everything is at version 0 right now
+apiVersion OffsetFetchRequest{}  = 1 -- have to be V1 to use kafka storage to allow metadata
+apiVersion OffsetCommitRequest{} = 1 -- have to be V1 to use kafka storage to allow metadata
+apiVersion _                     = ApiVersion 0 -- everything else is at version 0 right now
 
 apiKey :: RequestMessage -> ApiKey
 apiKey ProduceRequest{} = ApiKey 0
