@@ -3,6 +3,7 @@ module Network.Kafka where
 import Prelude
 
 -- base
+import Control.Concurrent     (threadDelay)
 import Control.Exception (Exception, IOException)
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
@@ -255,6 +256,16 @@ commitOffsetRequest consumerGroup topic partition offset =
    in OffsetCommitReq
         (consumerGroup, -1, "", time, [(topic, [(partition, offset, metadata_)])])
 
+getConsumerGroupCoordinator :: Kafka m => ConsumerGroup -> m Broker
+getConsumerGroupCoordinator group = do
+  let theReq = GroupCoordinatorRR $ GroupCoordinatorReq group
+  (GroupCoordinatorResp (err, broker)) <- withAnyHandle $ flip makeRequest theReq
+  case err of
+    ConsumerCoordinatorNotAvailableCode -> do  -- coordinator not ready, must retry with backoff
+      liftIO $ threadDelay 100000 -- todo something better than threadDelay?
+      getConsumerGroupCoordinator group
+    NoError -> return broker
+    other   -> throwError $ KafkaFailedToFetchGroupCoordinator other
 
 getTopicPartitionLeader :: Kafka m => TopicName -> Partition -> m Broker
 getTopicPartitionLeader t p = do
