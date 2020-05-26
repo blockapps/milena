@@ -54,9 +54,9 @@ specs = do
 
   let cleanup :: TopicName -> IO ()
       cleanup topicName = do
-          run $ do
-              stateAddresses %= NE.cons ("localhost", 9092)
-              deleteTopic (deleteTopicsRequest topicName)
+          _ <- run $ do
+                   stateAddresses %= NE.cons ("localhost", 9092)
+                   deleteTopic (deleteTopicsRequest topicName)
           pure ()
 
   describe "can talk to local Kafka server" $ do

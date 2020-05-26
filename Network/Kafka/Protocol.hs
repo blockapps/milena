@@ -1,3 +1,5 @@
+{-# LANGUAGE NoDeriveAnyClass #-}
+
 module Network.Kafka.Protocol
   ( module Network.Kafka.Protocol
   ) where
@@ -39,6 +41,7 @@ data ReqResp a where
   DeleteTopicsRR :: MonadIO m => DeleteTopicsRequest -> ReqResp (m DeleteTopicsResponse)
   OffsetCommitRR :: MonadIO m => OffsetCommitRequest -> ReqResp (m OffsetCommitResponse)
   OffsetFetchRR :: MonadIO m => OffsetFetchRequest -> ReqResp (m OffsetFetchResponse)
+  GroupCoordinatorRR  :: MonadIO m => GroupCoordinatorRequest -> ReqResp (m GroupCoordinatorResponse)
 
 doRequest' :: (Deserializable a, MonadIO m) => CorrelationId -> Handle -> Request -> m (Either String a)
 doRequest' correlationId h r = do
@@ -65,6 +68,7 @@ doRequest clientId correlationId h (TopicsRR req)   = doRequest' correlationId h
 doRequest clientId correlationId h (DeleteTopicsRR req)   = doRequest' correlationId h $ Request (correlationId, clientId, DeleteTopicsRequest req)
 doRequest clientId correlationId h (OffsetCommitRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetCommitRequest req)
 doRequest clientId correlationId h (OffsetFetchRR req) = doRequest' correlationId h $ Request (correlationId, clientId, OffsetFetchRequest req)
+doRequest clientId correlationId h (GroupCoordinatorRR req)  = doRequest' correlationId h $ Request (correlationId, clientId, GroupCoordinatorRequest req)
 
 class Serializable a where
   serialize :: a -> Put
@@ -218,7 +222,11 @@ newtype GroupCoordinatorRequest = GroupCoordinatorReq ConsumerGroup deriving (Sh
 newtype CreateTopicsRequest = CreateTopicsReq ([(TopicName, Partition, ReplicationFactor, [(Partition, Replicas)], [(KafkaString, Metadata)])], Timeout) deriving (Show, Eq, Serializable, Generic)
 newtype DeleteTopicsRequest = DeleteTopicsReq ([TopicName], Timeout) deriving (Show, Eq, Serializable, Generic)
 
-newtype OffsetCommitRequest = OffsetCommitReq (ConsumerGroup, [(TopicName, [(Partition, Offset, Time, Metadata)])]) deriving (Show, Eq, Serializable, Generic)
+newtype OffsetCommitRequest = OffsetCommitReq (ConsumerGroup, ConsumerGroupGeneration, ConsumerId, Time, [(TopicName, [(Partition, Offset, Metadata)])]) deriving (Show, Eq, Serializable, Generic)
+newtype ConsumerGroupGeneration = ConsumerGroupGeneration Int32 deriving (Show, Eq, Deserializable, Serializable, Num, Integral, Ord, Real, Enum)
+
+newtype ConsumerId = ConsumerId KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString)
+
 newtype OffsetFetchRequest = OffsetFetchReq (ConsumerGroup, [(TopicName, [Partition])]) deriving (Show, Eq, Serializable, Generic)
 newtype ConsumerGroup = ConsumerGroup KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString, Generic)
 newtype Metadata = Metadata KafkaString deriving (Show, Eq, Serializable, Deserializable, IsString, Generic)
@@ -509,7 +517,7 @@ requestBytes x = runPut $ do
 
 apiVersion :: RequestMessage -> ApiVersion
 apiVersion OffsetFetchRequest{}  = 1 -- have to be V1 to use kafka storage to allow metadata
-apiVersion OffsetCommitRequest{} = 1 -- have to be V1 to use kafka storage to allow metadata
+apiVersion OffsetCommitRequest{} = 2 -- use V2 commit to not deal with Timestamps, and get stored in Kafka
 apiVersion _                     = ApiVersion 0 -- everything else is at version 0 right now
 
 apiKey :: RequestMessage -> ApiKey

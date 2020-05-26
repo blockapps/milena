@@ -3,7 +3,6 @@ module Network.Kafka where
 import Prelude
 
 -- base
-import Control.Applicative
 import Control.Exception (Exception, IOException)
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
@@ -70,6 +69,7 @@ data KafkaClientError = -- | A response did not contain an offset.
                         -- | Could not find a cached broker for the found leader.
                       | KafkaInvalidBroker Leader
                       | KafkaFailedToFetchMetadata
+                      | KafkaFailedToFetchGroupCoordinator KafkaError
                       | KafkaIOException IOException
                         deriving (Eq, Generic, Show)
 
@@ -127,9 +127,9 @@ defaultRequestTimeout = 10000
 defaultMinBytes :: MinBytes
 defaultMinBytes = MinBytes 0
 
--- | Default: @1024 * 1024@
+-- | Default: @32 * 1024 * 1024@
 defaultMaxBytes :: MaxBytes
-defaultMaxBytes = 1024 * 1024
+defaultMaxBytes = 32 * 1024 * 1024
 
 -- | Default: @0@
 defaultMaxWaitTime :: MaxWaitTime
@@ -253,7 +253,7 @@ commitOffsetRequest consumerGroup topic partition offset =
   let time = -1
       metadata_ = Metadata "milena"
    in OffsetCommitReq
-        (consumerGroup, [(topic, [(partition, offset, time, metadata_)])])
+        (consumerGroup, -1, "", time, [(topic, [(partition, offset, metadata_)])])
 
 
 getTopicPartitionLeader :: Kafka m => TopicName -> Partition -> m Broker
