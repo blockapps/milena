@@ -219,7 +219,9 @@ deleteTopicsRequest topic = DeleteTopicsReq ([topic], defaultRequestTimeout)
 
 
 fetchOffset :: Kafka m => OffsetFetchRequest -> m OffsetFetchResponse
-fetchOffset request = withAnyHandle $ flip fetchOffset' request
+fetchOffset request@(OffsetFetchReq (group, _)) = do
+  coordinator <- getConsumerGroupCoordinator group
+  withBrokerHandle coordinator $ flip fetchOffset' request
 
 fetchOffset' :: Kafka m => Handle -> OffsetFetchRequest -> m OffsetFetchResponse
 fetchOffset' h request = makeRequest h $ OffsetFetchRR request
@@ -242,7 +244,9 @@ heartbeatRequest :: GroupId -> GenerationId -> MemberId -> HeartbeatRequest
 heartbeatRequest genId gId memId = HeartbeatReq (genId, gId, memId)
 
 commitOffset :: Kafka m => OffsetCommitRequest -> m OffsetCommitResponse
-commitOffset request = withAnyHandle $ flip commitOffset' request
+commitOffset request@(OffsetCommitReq (group, _, _, _, _)) = do
+  coordinator <- getConsumerGroupCoordinator group
+  withBrokerHandle coordinator $ flip commitOffset' request
 
 commitOffset' ::
      Kafka m => Handle -> OffsetCommitRequest -> m OffsetCommitResponse
